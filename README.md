@@ -1,383 +1,323 @@
-# 🚀 Macro Builder v3.0 - Guide Complet
 
-Un outil d'automatisation puissant pour créer et exécuter des macros avancées avec boucles imbriquées, variables et enregistrement automatique.
 
-## 📋 Table des Matières
+# 📘 Macro Builder v4.0 — Spécification Technique Complète
 
-- [Installation](#installation)
-- [Démarrage Rapide](#démarrage-rapide)
-- [Syntaxe des Commandes](#syntaxe-des-commandes)
-- [Boucles et Structures](#boucles-et-structures)
-- [Variables](#variables)
-- [Interface Utilisateur](#interface-utilisateur)
-- [Exemples Pratiques](#exemples-pratiques)
-- [Fonctionnalités Avancées](#fonctionnalités-avancées)
-- [Dépannage](#dépannage)
+> Ce document décrit précisément l’architecture, le langage, le comportement et les règles internes de Macro Builder v4.0.
+> Il permet à un développeur de recréer entièrement le projet sans accès au code original.
 
-## 🔧 Installation
+---
 
-### Prérequis
-```bash
-pip install tkinter pynput
+## 1. Objectif du projet
+
+Macro Builder est une application desktop permettant :
+
+* de créer des macros clavier et souris
+* via un langage de script dédié (DSL)
+* avec une interface graphique
+* et un moteur d’exécution contrôlable (pause, stop, debug)
+
+Le projet vise :
+
+* la lisibilité
+* la sécurité
+* l’extensibilité (v3 → v4+)
+
+---
+
+## 2. Stack technique imposée
+
+### Langage
+
+* Python 3.10+
+
+### Bibliothèques principales
+
+* `tkinter` : interface graphique
+* `pynput` : contrôle clavier et souris
+* `time` : gestion des délais
+* `threading` : exécution non bloquante
+* `json` : import/export
+* (optionnel) `PIL` / `opencv-python` : détection pixel/image
+
+---
+
+## 3. Architecture générale
+
+```
+macro_builder/
+│
+├── main.py                 # Point d’entrée
+├── ui/
+│   ├── window.py           # Fenêtre principale
+│   ├── editor.py           # Zone d’édition + lignes
+│   ├── controls.py         # Boutons, sliders, logs
+│
+├── engine/
+│   ├── parser.py           # Analyse du script
+│   ├── executor.py         # Exécution ligne par ligne
+│   ├── context.py          # Variables, état global
+│   ├── recorder.py         # Enregistrement actions
+│
+├── commands/
+│   ├── keyboard.py
+│   ├── mouse.py
+│   ├── control.py
+│
+├── utils/
+│   ├── file_io.py
+│   ├── color.py
+│   ├── logger.py
+│
+└── assets/
 ```
 
-### Lancement
-```bash
-python macro_builder_v3.py
+---
+
+## 4. Modèle d’exécution
+
+### Principe
+
+* Le script est lu **ligne par ligne**
+* Chaque ligne devient une **Instruction**
+* L’exécution se fait dans un **thread séparé**
+* Le moteur doit supporter :
+
+  * pause
+  * reprise
+  * arrêt immédiat
+
+---
+
+## 5. Règles du langage (DSL v4)
+
+### 5.1 Syntaxe générale
+
+* Une instruction par ligne
+* Séparateur : `,`
+* Indentation = structure logique
+* Commentaire : `#`
+
+---
+
+### 5.2 Variables
+
+#### Déclaration
+
+```
+$nom = "Jean"
+$age = 25
 ```
 
-## ⚡ Démarrage Rapide
+#### Types
 
-1. **Lancez l'application**
-2. **Écrivez votre script** dans la zone de texte (gauche)
-3. **Ajustez la vitesse** avec le curseur (droite)
-4. **Cliquez sur "▶ Exécuter"**
+* string
+* int
+* float
+* bool
 
-### Premier Script
+#### Calculs
+
 ```
-type,Bonjour le monde!
-press,enter,0.1
-wait,1.0
-type,Ma première macro
+$score += 10
+$hp -= 1
 ```
 
-## 📖 Syntaxe des Commandes
+---
 
-### 🎹 Commandes Clavier
+### 5.3 Variables automatiques
 
-| Commande | Syntaxe | Description | Exemple |
-|----------|---------|-------------|---------|
-| `press` | `press,touche,durée` | Appuyer sur une touche | `press,a,0.1` |
-| `press` | `press,combo,durée` | Combinaison de touches | `press,ctrl+c,0.5` |
-| `hotkey` | `hotkey,combo` | Raccourci rapide | `hotkey,alt+tab` |
-| `type` | `type,texte` | Taper du texte | `type,Hello World` |
+| Nom           | Description        |
+| ------------- | ------------------ |
+| `$i`          | Compteur de boucle |
+| `@speed`      | Vitesse globale    |
+| `@iterations` | Variable UI        |
 
-**Touches spéciales disponibles :**
-- `enter`, `space`, `tab`, `backspace`, `delete`
-- `ctrl`, `alt`, `shift`, `esc`, `home`, `end`
-- `up`, `down`, `left`, `right`
-- `f1` à `f12`
+---
 
-### 🖱️ Commandes Souris
+## 6. Boucles
 
-| Commande | Syntaxe | Description | Exemple |
-|----------|---------|-------------|---------|
-| `lmc` | `lmc` | Click gauche | `lmc` |
-| `rmc` | `rmc` | Click droit | `rmc` |
-| `mmc` | `mmc` | Click milieu | `mmc` |
-| `click` | `click,x,y,bouton` | Click à position | `click,100,200,left` |
-| `drag` | `drag,x1,y1,x2,y2` | Glisser-déposer | `drag,0,0,100,100` |
-| `move` | `move,x,y` | Déplacer curseur | `move,500,300` |
-| `scroll` | `scroll,direction,quantité` | Défiler | `scroll,up,3` |
-| `on` | `on,bouton` | Maintenir enfoncé | `on,lmc` |
-| `off` | `off,bouton` | Relâcher | `off,lmc` |
+### Boucle simple
 
-### ⏱️ Commandes de Contrôle
-
-| Commande | Syntaxe | Description | Exemple |
-|----------|---------|-------------|---------|
-| `wait` | `wait,secondes` | Attendre | `wait,2.5` |
-| `echo` | `echo,message` | Message debug | `echo,Debug info` |
-
-## 🔄 Boucles et Structures
-
-### Boucles Simples
 ```
 loop,5
-    type,Répétition numéro $i
-    press,enter,0.1
-    wait,0.5
+    ...
 next
 ```
 
-### Boucles Imbriquées
-```
-loop,3
-    type,Boucle externe $i
-    press,enter,0.1
-    
-    loop,2
-        type,  Boucle interne $i
-        press,tab,0.1
-    next
-    
-    wait,1.0
-next
-```
+### Boucle infinie
 
-### Boucle Infinie
 ```
 loop,infinite
-    type,Boucle sans fin
-    wait,1.0
-    # Utilisez le bouton "Arrêter" pour stopper
+    ...
 endloop
 ```
 
-### Conditions
+### Boucle conditionnelle
+
 ```
-if,true
-    type,Cette condition est vraie
-    press,enter,0.1
+while,$hp > 0
+    ...
+endwhile
+```
+
+---
+
+## 7. Conditions
+
+### Syntaxe
+
+```
+if,condition
+    ...
 endif
 ```
 
-**⚠️ Important :** L'indentation (espaces ou tabulations) définit l'imbrication des blocs !
+### Conditions supportées
 
-## 📊 Variables
+* `$a == $b`
+* `$a != 10`
+* `$x > 5`
+* `exists,$var`
+* `pixel,x,y,#RRGGBB`
 
-### Définir des Variables
-```
-$nom = Jean Dupont
-$age = 25
-$email = jean@example.com
-```
+---
 
-### Utiliser des Variables
-```
-type,Nom: $nom
-press,tab,0.1
-type,Age: $age
-press,tab,0.1
-type,Email: $email
-```
+## 8. Fonctions
 
-### Variables Automatiques
-- `$i` : Compteur de boucle automatique (commence à 0)
+### Déclaration
 
 ```
-loop,5
-    type,Itération numéro $i
-    press,enter,0.1
-next
+function heal()
+    press,h,0.1
+endfunction
 ```
 
-## 🖥️ Interface Utilisateur
+### Appel
 
-### Zone d'Édition (Gauche)
-- **Éditeur de texte** avec coloration syntaxique
-- **Numérotation des lignes** automatique
-- **Support de l'indentation** pour les boucles
-
-### Panneau de Contrôle (Droite)
-
-#### Exécution
-- **Curseur de vitesse** : 0.1x à 5.0x
-- **▶ Exécuter** : Lancer la macro
-- **⏸ Pause** : Suspendre/reprendre
-- **⏹ Arrêter** : Arrêt immédiat
-
-#### Enregistrement
-- **🔴 Enregistrer** : Capturer vos actions automatiquement
-- Génère le script correspondant
-
-#### Status
-- **Log en temps réel** avec timestamps
-- **Barre de progression** détaillée
-- **Messages d'erreur** explicites
-
-### Menu Principal
-
-#### Fichier
-- **Nouveau** (Ctrl+N) : Script vierge
-- **Ouvrir** (Ctrl+O) : Charger fichier .macro/.txt
-- **Enregistrer** (Ctrl+S) : Sauvegarder
-- **Import/Export JSON** : Avec métadonnées
-
-#### Édition
-- **Insérer Template** : Modèles prêts à l'emploi
-- **Valider Syntaxe** : Vérification avant exécution
-
-#### Aide
-- **Syntaxe** : Guide complet
-- **À propos** : Informations version
-
-## 💡 Exemples Pratiques
-
-### 1. Automatisation de Saisie
 ```
-# Remplir un formulaire
-$prenom = Marie
-$nom = Martin
-$tel = 0123456789
-
-type,$prenom
-press,tab,0.1
-type,$nom
-press,tab,0.1  
-type,$tel
-press,enter,0.5
+heal()
 ```
 
-### 2. Navigation Web
-```
-# Ouvrir plusieurs onglets
-loop,5
-    hotkey,ctrl+t
-    wait,0.5
-    type,https://example$i.com
-    press,enter,1.0
-next
-```
+Les fonctions :
 
-### 3. Test de Performance
-```
-# Stress test avec timing
-$iterations = 100
-loop,$iterations
-    echo,Test $i/$iterations
-    hotkey,ctrl+r
-    wait,2.0
-    press,esc,0.1
-next
-```
+* n’ont pas de retour
+* ont accès au contexte global
 
-### 4. Automation Gaming
-```
-# Macro de jeu avec combos
-wait,5
-loop,infinite
-    on,lmc
-    loop,27
-        press,d+z,15
-        press,z,2
-        press,q+z,15
-        press,z,2
-    endloop
-    off,lmc
-    type,!warp garden
-endloop
-```
+---
 
-### 5. Nettoyage de Fichiers
-```
-# Sélectionner et supprimer
-loop,10
-    press,down,0.1
-    press,shift+down,0.1
-next
-press,delete,0.5
-press,enter,0.1  # Confirmer
-```
+## 9. Commandes clavier
 
-## 🎯 Fonctionnalités Avancées
+| Commande             | Effet        |
+| -------------------- | ------------ |
+| `press,touche,durée` | Appui simple |
+| `press,ctrl+c,durée` | Combo        |
+| `hotkey,alt+tab`     | Raccourci    |
+| `type,texte`         | Écriture     |
 
-### Enregistrement Automatique
-1. Cliquez **🔴 Enregistrer**
-2. Effectuez vos actions (clavier + souris)
-3. Cliquez **⏹ Arrêter Rec**
-4. Le script est généré automatiquement
+Touches spéciales mappées via `pynput.keyboard.Key`.
 
-### Templates Intégrés
-- **Test de frappe** : Saisie automatique
-- **Navigation fenêtres** : Alt+Tab automation
-- **Remplissage formulaires** : Données structurées
-- **Macros gaming** : Séquences répétitives
-- **Automation clicks** : Positionnement précis
+---
 
-### Contrôles Avancés
+## 10. Commandes souris
 
-#### Vitesse Variable
-- **0.1x** : Ultra lent (debug)
-- **1.0x** : Vitesse normale
-- **5.0x** : Ultra rapide
+| Commande              | Effet          |
+| --------------------- | -------------- |
+| `lmc` / `rmc` / `mmc` | Click          |
+| `move,x,y`            | Déplacement    |
+| `click,x,y,left`      | Click position |
+| `drag,x1,y1,x2,y2`    | Glisser        |
+| `scroll,up,3`         | Scroll         |
+| `on,lmc` / `off,lmc`  | Maintien       |
 
-#### Pause/Reprise
-- Suspendre à tout moment
-- Reprendre exactement où arrêté
-- État sauvegardé
+---
 
-#### Arrêt d'Urgence
-- Bouton **⏹ Arrêter** toujours accessible
-- Arrêt immédiat et sécurisé
+## 11. Commandes de contrôle
 
-### Import/Export JSON
+| Commande        | Description |
+| --------------- | ----------- |
+| `wait,secondes` | Pause       |
+| `echo,message`  | Log         |
+| `breakpoint`    | Pause debug |
+
+---
+
+## 12. Enregistrement automatique
+
+### Fonctionnement
+
+* Capture :
+
+  * touches pressées
+  * clicks
+  * positions
+  * délais
+* Génère un script DSL équivalent
+* Nettoyage automatique (groupes, délais inutiles)
+
+---
+
+## 13. Mode Debug
+
+Fonctionnalités obligatoires :
+
+* Ligne active surlignée
+* Valeurs des variables affichées
+* Step by step
+* Breakpoints
+
+---
+
+## 14. Import / Export
+
+### Format JSON
+
 ```json
 {
-  "script": "type,Hello\nwait,1.0",
-  "speed": 1.5,
-  "exported_at": "2024-01-15T10:30:00"
+  "version": "4.0",
+  "speed": 1.2,
+  "script": "...",
+  "metadata": {
+    "created_at": "ISO-8601"
+  }
 }
 ```
 
-## 🐞 Dépannage
+---
 
-### Problèmes Courants
+## 15. Sécurité
 
-#### "Erreur de syntaxe"
-- ✅ Vérifiez l'indentation (espaces/tabs cohérents)
-- ✅ Validez que chaque `loop` a son `next`
-- ✅ Utilisez la fonction **Valider Syntaxe**
-
-#### "Macro ne s'exécute pas"
-- ✅ Vérifiez les permissions (certaines apps bloquent l'automation)
-- ✅ Testez avec un script simple d'abord
-- ✅ Regardez les logs de status
-
-#### "Actions trop rapides/lentes"
-- ✅ Ajustez le curseur de vitesse
-- ✅ Ajoutez des `wait` entre actions critiques
-- ✅ Utilisez la pause pour débugger
-
-#### "Variables non reconnues"
-- ✅ Définissez avec `$nom = valeur` avant usage
-- ✅ Utilisez exactement le même nom
-- ✅ Pas d'espaces dans les noms de variables
-
-### Messages d'Erreur
-
-| Message | Cause | Solution |
-|---------|-------|----------|
-| `Invalid loop count` | Compteur de boucle invalide | Utilisez un nombre entier |
-| `Loop nécessite un paramètre` | `loop` sans nombre | Ajoutez `,10` par exemple |
-| `Condition non reconnue` | Syntaxe if incorrecte | Utilisez `if,true` pour test |
-
-### Performance
-
-#### Scripts Lents
-- Réduisez les `wait` inutiles
-- Augmentez la vitesse d'exécution
-- Optimisez les boucles imbriquées
-
-#### Utilisation Mémoire
-- Évitez les boucles infinies sans `wait`
-- Limitez les boucles à 10000 itérations max
-- Nettoyez les logs régulièrement
-
-## 🔒 Sécurité et Bonnes Pratiques
-
-### Recommandations
-- ✅ **Testez d'abord** avec vitesse lente (0.1x)
-- ✅ **Sauvegardez** vos scripts importants
-- ✅ **Utilisez des wait** pour éviter les blocages
-- ✅ **Préparez un arrêt d'urgence** (bouton Stop)
-
-### Limites
-- ⚠️ Certaines applications bloquent l'automation
-- ⚠️ Les boucles infinies peuvent surcharger le système
-- ⚠️ Permissions administrateur parfois nécessaires
-
-## 📞 Support
-
-### Résolution de Problèmes
-1. Consultez les **logs de status** (panneau droit)
-2. Utilisez **Valider Syntaxe** avant exécution
-3. Testez avec des scripts simples d'abord
-4. Vérifiez la **syntaxe d'indentation**
-
-### Ressources
-- **Menu Aide > Syntaxe** : Reference complète
-- **Templates intégrés** : Exemples fonctionnels
-- **Mode debug** : Vitesse 0.1x + echo messages
+* Limite d’itérations configurable
+* Timeout global
+* Bouton STOP toujours prioritaire
+* Blocage des `eval()` dangereux
 
 ---
 
-## 🎉 Conclusion
+## 16. Règles non négociables
 
-Macro Builder v3.0 est un outil puissant pour automatiser vos tâches répétitives. Avec ses boucles imbriquées, variables et interface moderne, vous pouvez créer des automatisations sophistiquées en quelques minutes.
-
-**Bon scripting ! 🚀**
+* Le moteur ne doit jamais bloquer l’UI
+* Un script invalide ne s’exécute jamais
+* Toute boucle infinie doit contenir un `wait`
+* L’arrêt utilisateur doit être immédiat
 
 ---
 
-*Version 3.0 - Dernière mise à jour : 2024*
+## 17. Résultat attendu
+
+Un développeur recevant **uniquement ce document** doit pouvoir :
+
+* recréer l’UI
+* implémenter le parser
+* reconstruire le moteur
+* reproduire le comportement exact
+
+---
+
+## 18. Statut
+
+Version de référence : **Macro Builder v4.0**
+Document : **Spécification officielle**
+
+---
+
+
