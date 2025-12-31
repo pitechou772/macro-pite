@@ -1,5 +1,73 @@
 
 
+# 📘 Macro Builder v4.0 — Macro IDE
+
+> This project is a desktop IDE to build and run keyboard/mouse macros with its own scripting language (DSL).
+> The sections below give you a **quick start guide**, then the original **full technical specification**.
+
+---
+
+## 🔰 Quick Start (English)
+
+### 1. Requirements
+
+- Python 3.10+
+- `pip` available in your PATH
+
+Recommended (for best experience):
+
+- Windows (macro recording uses mouse/keyboard hooks)
+
+### 2. Install dependencies
+
+From the project folder:
+
+```bash
+pip install -r requirements.txt
+```
+
+If you do not have a `requirements.txt` yet, you can install the core libraries manually:
+
+```bash
+pip install PyQt5 QScintilla pynput pillow
+```
+
+### 3. Start the IDE
+
+```bash
+python main.py
+```
+
+You should see **Macro Builder v4.0 - Professional IDE** with:
+
+- Colorful code editor (syntax highlighting, folding, auto-completion)
+- Dark console at the bottom with green text
+- Speed slider and iterations selector
+- Debug panel (variables, breakpoints, step mode)
+
+### 4. First macro
+
+Create a new file (`Ctrl+N`) and paste for example:
+
+```text
+echo, Starting demo
+loop,3
+    echo, Loop $i
+    wait,1
+endloop
+echo, Done
+```
+
+Press **F7** to validate syntax, then **F5** to run.
+
+### 5. Where to find full command help
+
+- IDE help: menu **Aide → À propos**
+- Online / generated docs (MkDocs): see `documentation/` folder
+- Detailed language reference: `documentation/docs/command-reference.md` (added for easy lookup of **all commands with examples**)
+
+---
+
 # 📘 Macro Builder v4.0 — Spécification Technique Complète
 
 > Ce document décrit précisément l’architecture, le langage, le comportement et les règles internes de Macro Builder v4.0.

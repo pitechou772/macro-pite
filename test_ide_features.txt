@@ -1,0 +1,70 @@
+# Test Macro for IDE Features
+# This demonstrates syntax highlighting, auto-completion, and code folding
+
+# Variables (should be teal)
+$counter = 0
+$message = "Hello World"
+
+# System variables (should be orange/bold)
+$mouse_x
+$mouse_y
+$screen_width
+
+# Settings (should be brown/red)
+@speed = 1.5
+@iterations = 10
+
+# Comments should be green/italic
+
+# Loop block (foldable)
+loop,5
+    # Keywords should be blue/bold
+    press,a
+    wait,100
+
+    # Nested loop (foldable)
+    loop,3
+        click,100,200,left
+        wait,50
+    endloop
+
+    # Numbers should be green
+    wait,250
+endloop
+
+# Conditional block (foldable)
+if,$counter < 10
+    echo,Counter is less than 10
+    type,Test message
+elseif,$counter == 10
+    echo,Counter equals 10
+else
+    echo,Counter is greater than 10
+endif
+
+# Function definition (foldable)
+function,my_function
+    press,ctrl+c
+    wait,100
+    press,ctrl+v
+    echo,Function executed
+endfunction
+
+# Function call
+my_function()
+
+# Mouse commands
+mousemove,500,300
+lmc
+rmc
+
+# String literals (should be red)
+type,"This is a test"
+echo,'Another string'
+
+# Operators (should be black)
+$result = 5 + 10 * 2
+$compare = $result > 50
+
+# Breakpoint for debugging
+breakpoint

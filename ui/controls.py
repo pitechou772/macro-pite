@@ -1,31 +1,32 @@
 """
-Control Panel Module
+Control Panel Module (PyQt5 version)
 Console output, control buttons, speed slider, and debug panel
 """
-import tkinter as tk
-from tkinter import ttk
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                             QTextEdit, QPushButton, QSlider, QSpinBox, QFrame)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QColor, QPalette
 import datetime
 
 
-class ControlPanel(tk.Frame):
+class ControlPanel(QWidget):
     """Control panel with console, buttons, and debug features"""
 
-    def __init__(self, parent, callbacks, **kwargs):
+    def __init__(self, parent, callbacks):
         """
         Initialize control panel
 
         Args:
             parent: Parent widget
             callbacks: Dict of callback functions {execute, pause, stop, etc.}
-            **kwargs: Additional frame arguments
         """
-        super().__init__(parent, **kwargs)
+        super().__init__(parent)
 
         self.callbacks = callbacks
 
         # Variables
-        self.speed_var = tk.DoubleVar(value=1.0)
-        self.iterations_var = tk.IntVar(value=1)
+        self.speed_value = 1.0
+        self.iterations_value = 1
 
         # Debug panel visibility
         self.debug_panel_visible = False
@@ -34,134 +35,142 @@ class ControlPanel(tk.Frame):
 
     def _build_ui(self):
         """Build control panel UI"""
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 5, 10, 5)
+
         # Console section
-        console_frame = tk.Frame(self)
-        console_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        console_label = QLabel("Console:")
+        layout.addWidget(console_label)
 
-        ttk.Label(console_frame, text="Console :").pack(anchor='w')
+        # Console text area with dark theme
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setMinimumHeight(150)
+        self.console.setMaximumHeight(250)
+        self.console.setFont(QFont("Consolas", 10))
 
-        # Console with scrollbar
-        console_container = tk.Frame(console_frame)
-        console_container.pack(fill='both', expand=True)
+        # Dark console theme
+        palette = self.console.palette()
+        palette.setColor(QPalette.Base, QColor("#222222"))
+        palette.setColor(QPalette.Text, QColor("#00FF00"))
+        self.console.setPalette(palette)
 
-        self.console = tk.Text(
-            console_container,
-            height=10,
-            state='disabled',
-            bg='#222',
-            fg='#0f0',
-            font=('Consolas', 10),
-            wrap='word'
-        )
-        self.console.pack(side='left', fill='both', expand=True)
-
-        console_scrollbar = ttk.Scrollbar(console_container, command=self.console.yview)
-        console_scrollbar.pack(side='right', fill='y')
-        self.console.config(yscrollcommand=console_scrollbar.set)
+        layout.addWidget(self.console)
 
         # Control buttons section
-        controls = ttk.Frame(self)
-        controls.pack(fill='x', pady=5, padx=10)
+        controls_layout = QHBoxLayout()
 
         # Speed control
-        ttk.Label(controls, text="Vitesse :").pack(side='left', padx=5)
-        ttk.Scale(
-            controls,
-            from_=0.1,
-            to=5.0,
-            variable=self.speed_var,
-            orient='horizontal',
-            length=150
-        ).pack(side='left', fill='x', expand=False, padx=5)
+        controls_layout.addWidget(QLabel("Vitesse:"))
 
-        ttk.Label(controls, textvariable=self.speed_var, width=4).pack(side='left')
+        self.speed_slider = QSlider(Qt.Horizontal)
+        self.speed_slider.setMinimum(1)  # 0.1x
+        self.speed_slider.setMaximum(50)  # 5.0x
+        self.speed_slider.setValue(10)  # 1.0x
+        self.speed_slider.setTickPosition(QSlider.TicksBelow)
+        self.speed_slider.setTickInterval(5)
+        self.speed_slider.setMinimumWidth(150)
+        self.speed_slider.valueChanged.connect(self._update_speed_label)
+        controls_layout.addWidget(self.speed_slider)
+
+        self.speed_label = QLabel("1.0")
+        self.speed_label.setMinimumWidth(40)
+        controls_layout.addWidget(self.speed_label)
 
         # Iterations control
-        ttk.Label(controls, text="Itérations :").pack(side='left', padx=(20, 5))
-        ttk.Entry(
-            controls,
-            textvariable=self.iterations_var,
-            width=6
-        ).pack(side='left', padx=5)
+        controls_layout.addWidget(QLabel("Itérations:"))
+
+        self.iterations_spin = QSpinBox()
+        self.iterations_spin.setMinimum(1)
+        self.iterations_spin.setMaximum(99999)
+        self.iterations_spin.setValue(1)
+        self.iterations_spin.setMinimumWidth(60)
+        self.iterations_spin.valueChanged.connect(self._update_iterations)
+        controls_layout.addWidget(self.iterations_spin)
 
         # Spacer
-        tk.Frame(controls).pack(side='left', fill='x', expand=True)
+        controls_layout.addStretch()
 
         # Execution buttons
-        self.btn_execute = ttk.Button(
-            controls,
-            text="▶ Exécuter",
-            command=lambda: self._call('execute')
-        )
-        self.btn_execute.pack(side='right', padx=2)
+        self.btn_stop = QPushButton("⏹ Arrêter")
+        self.btn_stop.clicked.connect(lambda: self._call('stop'))
+        controls_layout.addWidget(self.btn_stop)
 
-        self.btn_pause = ttk.Button(
-            controls,
-            text="⏸ Pause",
-            command=lambda: self._call('pause')
-        )
-        self.btn_pause.pack(side='right', padx=2)
+        self.btn_pause = QPushButton("⏸ Pause")
+        self.btn_pause.clicked.connect(lambda: self._call('pause'))
+        controls_layout.addWidget(self.btn_pause)
 
-        self.btn_stop = ttk.Button(
-            controls,
-            text="⏹ Arrêter",
-            command=lambda: self._call('stop')
-        )
-        self.btn_stop.pack(side='right', padx=2)
+        self.btn_execute = QPushButton("▶ Exécuter")
+        self.btn_execute.clicked.connect(lambda: self._call('execute'))
+        controls_layout.addWidget(self.btn_execute)
+
+        layout.addLayout(controls_layout)
 
         # Debug panel (initially hidden)
-        self.debug_frame = tk.Frame(self, relief='sunken', borderwidth=1)
+        self.debug_frame = QFrame()
+        self.debug_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self._build_debug_panel()
+        self.debug_frame.hide()
+
+        layout.addWidget(self.debug_frame)
+
+        self.setLayout(layout)
 
     def _build_debug_panel(self):
         """Build debug panel (hidden by default)"""
-        ttk.Label(self.debug_frame, text="Debug Mode", font=('Arial', 10, 'bold')).pack(anchor='w', padx=5, pady=5)
+        layout = QVBoxLayout()
+
+        # Debug label
+        debug_label = QLabel("Debug Mode")
+        debug_label.setFont(QFont("Arial", 10, QFont.Bold))
+        layout.addWidget(debug_label)
 
         # Debug buttons
-        debug_buttons = ttk.Frame(self.debug_frame)
-        debug_buttons.pack(fill='x', padx=5, pady=5)
+        debug_buttons_layout = QHBoxLayout()
 
-        ttk.Button(
-            debug_buttons,
-            text="⏭ Step",
-            command=lambda: self._call('step_next')
-        ).pack(side='left', padx=2)
+        step_btn = QPushButton("⏭ Step")
+        step_btn.clicked.connect(lambda: self._call('step_next'))
+        debug_buttons_layout.addWidget(step_btn)
 
-        ttk.Button(
-            debug_buttons,
-            text="🔴 Toggle Breakpoint",
-            command=lambda: self._call('toggle_breakpoint')
-        ).pack(side='left', padx=2)
+        toggle_bp_btn = QPushButton("🔴 Toggle Breakpoint")
+        toggle_bp_btn.clicked.connect(lambda: self._call('toggle_breakpoint'))
+        debug_buttons_layout.addWidget(toggle_bp_btn)
 
-        ttk.Button(
-            debug_buttons,
-            text="Clear Breakpoints",
-            command=lambda: self._call('clear_breakpoints')
-        ).pack(side='left', padx=2)
+        clear_bp_btn = QPushButton("Clear Breakpoints")
+        clear_bp_btn.clicked.connect(lambda: self._call('clear_breakpoints'))
+        debug_buttons_layout.addWidget(clear_bp_btn)
+
+        debug_buttons_layout.addStretch()
+
+        layout.addLayout(debug_buttons_layout)
 
         # Variable inspector
-        inspector_frame = tk.Frame(self.debug_frame)
-        inspector_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        var_label = QLabel("Variables:")
+        layout.addWidget(var_label)
 
-        ttk.Label(inspector_frame, text="Variables:").pack(anchor='w')
+        self.variable_list = QTextEdit()
+        self.variable_list.setReadOnly(True)
+        self.variable_list.setMaximumHeight(100)
+        self.variable_list.setFont(QFont("Consolas", 9))
 
-        # Variable list with scrollbar
-        var_container = tk.Frame(inspector_frame)
-        var_container.pack(fill='both', expand=True)
+        # Light theme for variables
+        palette = self.variable_list.palette()
+        palette.setColor(QPalette.Base, QColor("#F9F9F9"))
+        palette.setColor(QPalette.Text, QColor("#000000"))
+        self.variable_list.setPalette(palette)
 
-        self.variable_list = tk.Text(
-            var_container,
-            height=5,
-            state='disabled',
-            bg='#f9f9f9',
-            font=('Consolas', 9),
-            wrap='none'
-        )
-        self.variable_list.pack(side='left', fill='both', expand=True)
+        layout.addWidget(self.variable_list)
 
-        var_scrollbar = ttk.Scrollbar(var_container, command=self.variable_list.yview)
-        var_scrollbar.pack(side='right', fill='y')
-        self.variable_list.config(yscrollcommand=var_scrollbar.set)
+        self.debug_frame.setLayout(layout)
+
+    def _update_speed_label(self, value):
+        """Update speed label when slider changes"""
+        self.speed_value = value / 10.0
+        self.speed_label.setText(f"{self.speed_value:.1f}")
+
+    def _update_iterations(self, value):
+        """Update iterations value"""
+        self.iterations_value = value
 
     def _call(self, callback_name):
         """Call a callback if it exists"""
@@ -176,26 +185,25 @@ class ControlPanel(tk.Frame):
             message: Message to log
         """
         timestamp = datetime.datetime.now().strftime('%H:%M:%S')
-        formatted = f"[{timestamp}] {message}\n"
+        formatted = f"[{timestamp}] {message}"
 
-        self.console.config(state='normal')
-        self.console.insert('end', formatted)
-        self.console.see('end')
-        self.console.config(state='disabled')
+        self.console.append(formatted)
+
+        # Auto-scroll to bottom
+        scrollbar = self.console.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def clear_console(self):
         """Clear console output"""
-        self.console.config(state='normal')
-        self.console.delete('1.0', 'end')
-        self.console.config(state='disabled')
+        self.console.clear()
 
     def get_speed(self):
         """Get speed multiplier"""
-        return self.speed_var.get()
+        return self.speed_value
 
     def get_iterations(self):
         """Get iteration count"""
-        return self.iterations_var.get()
+        return self.iterations_value
 
     def show_debug_panel(self, show=True):
         """
@@ -204,11 +212,11 @@ class ControlPanel(tk.Frame):
         Args:
             show: True to show, False to hide
         """
-        if show and not self.debug_panel_visible:
-            self.debug_frame.pack(fill='x', padx=10, pady=5, before=self.winfo_children()[0])
+        if show:
+            self.debug_frame.show()
             self.debug_panel_visible = True
-        elif not show and self.debug_panel_visible:
-            self.debug_frame.pack_forget()
+        else:
+            self.debug_frame.hide()
             self.debug_panel_visible = False
 
     def update_variables(self, variables):
@@ -218,13 +226,10 @@ class ControlPanel(tk.Frame):
         Args:
             variables: Dict of variables to display
         """
-        self.variable_list.config(state='normal')
-        self.variable_list.delete('1.0', 'end')
+        self.variable_list.clear()
 
         if variables:
             for var_name, var_value in sorted(variables.items()):
-                self.variable_list.insert('end', f"{var_name} = {var_value}\n")
+                self.variable_list.append(f"{var_name} = {var_value}")
         else:
-            self.variable_list.insert('end', "(No variables)")
-
-        self.variable_list.config(state='disabled')
+            self.variable_list.append("(No variables)")

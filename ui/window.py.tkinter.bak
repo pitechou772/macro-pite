@@ -1,14 +1,12 @@
 """
-Main Window Module (PyQt5 version)
+Main Window Module
 Orchestrates the entire application - UI, engine, and interactions
 """
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QMenuBar,
-                             QMenu, QAction, QFileDialog, QMessageBox, QInputDialog)
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtCore import Qt
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import threading
 
-from ui.editor import MacroEditor
+from ui.editor import CodeEditor
 from ui.controls import ControlPanel
 from engine.context import ExecutionContext
 from engine.parser import ScriptParser
@@ -17,15 +15,15 @@ from engine.recorder import ActionRecorder
 from utils.file_io import FileManager
 
 
-class MacroBuilderWindow(QMainWindow):
+class MacroBuilderWindow(tk.Tk):
     """Main application window"""
 
     def __init__(self):
         """Initialize main window"""
         super().__init__()
 
-        self.setWindowTitle("Macro Builder v4.0 - Professional IDE")
-        self.setGeometry(100, 100, 1200, 900)
+        self.title("Macro Builder v4.0")
+        self.geometry("1000x800")
 
         # File state
         self.current_file = None
@@ -43,19 +41,15 @@ class MacroBuilderWindow(QMainWindow):
 
         # Build UI
         self._build_ui()
-        self._build_menu()
 
     def _build_ui(self):
         """Build main UI"""
-        # Central widget with layout
-        central_widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        # Menu bar
+        self._build_menu()
 
-        # Editor (with parser for validation)
-        self.editor = MacroEditor(parser=self.parser)
-        layout.addWidget(self.editor)
+        # Editor
+        self.editor = CodeEditor(self)
+        self.editor.pack(fill='both', expand=True, padx=10, pady=5)
 
         # Controls
         callbacks = {
@@ -67,153 +61,88 @@ class MacroBuilderWindow(QMainWindow):
             'clear_breakpoints': self.clear_breakpoints
         }
         self.controls = ControlPanel(self, callbacks)
-        layout.addWidget(self.controls)
-
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
+        self.controls.pack(fill='both', expand=False, padx=10, pady=5)
 
     def _build_menu(self):
         """Build menu bar"""
-        menubar = self.menuBar()
+        menubar = tk.Menu(self)
 
         # File menu
-        file_menu = menubar.addMenu("&Fichier")
-
-        new_action = QAction("&Nouveau", self)
-        new_action.setShortcut(QKeySequence.New)
-        new_action.triggered.connect(self.new_file)
-        file_menu.addAction(new_action)
-
-        open_action = QAction("&Ouvrir", self)
-        open_action.setShortcut(QKeySequence.Open)
-        open_action.triggered.connect(self.load_file)
-        file_menu.addAction(open_action)
-
-        save_action = QAction("&Enregistrer", self)
-        save_action.setShortcut(QKeySequence.Save)
-        save_action.triggered.connect(self.save_file)
-        file_menu.addAction(save_action)
-
-        save_as_action = QAction("Enregistrer &sous...", self)
-        save_as_action.setShortcut(QKeySequence.SaveAs)
-        save_as_action.triggered.connect(self.save_file_as)
-        file_menu.addAction(save_as_action)
-
-        file_menu.addSeparator()
-
-        load_json_action = QAction("Ouvrir &JSON", self)
-        load_json_action.triggered.connect(self.load_json)
-        file_menu.addAction(load_json_action)
-
-        save_json_action = QAction("Enregistrer J&SON", self)
-        save_json_action.triggered.connect(self.save_json)
-        file_menu.addAction(save_json_action)
-
-        file_menu.addSeparator()
-
-        quit_action = QAction("&Quitter", self)
-        quit_action.setShortcut(QKeySequence.Quit)
-        quit_action.triggered.connect(self.close)
-        file_menu.addAction(quit_action)
+        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="Nouveau", command=self.new_file, accelerator="Ctrl+N")
+        filemenu.add_command(label="Ouvrir", command=self.load_file, accelerator="Ctrl+O")
+        filemenu.add_command(label="Enregistrer", command=self.save_file, accelerator="Ctrl+S")
+        filemenu.add_command(label="Enregistrer sous...", command=self.save_file_as)
+        filemenu.add_separator()
+        filemenu.add_command(label="Ouvrir JSON", command=self.load_json)
+        filemenu.add_command(label="Enregistrer JSON", command=self.save_json)
+        filemenu.add_separator()
+        filemenu.add_command(label="Quitter", command=self.quit)
+        menubar.add_cascade(label="Fichier", menu=filemenu)
 
         # Edit menu
-        edit_menu = menubar.addMenu("&Édition")
-
-        validate_action = QAction("&Valider Syntaxe", self)
-        validate_action.setShortcut("F7")
-        validate_action.triggered.connect(self.validate_syntax)
-        edit_menu.addAction(validate_action)
-
-        edit_menu.addSeparator()
-
-        find_action = QAction("&Rechercher...", self)
-        find_action.setShortcut(QKeySequence.Find)
-        find_action.triggered.connect(self.editor.show_search_dialog)
-        edit_menu.addAction(find_action)
+        editmenu = tk.Menu(menubar, tearoff=0)
+        editmenu.add_command(label="Valider Syntaxe", command=self.validate_syntax, accelerator="F7")
+        menubar.add_cascade(label="Édition", menu=editmenu)
 
         # Debug menu
-        debug_menu = menubar.addMenu("&Debug")
-
-        debug_mode_action = QAction("Mode &Debug", self)
-        debug_mode_action.setShortcut("F8")
-        debug_mode_action.triggered.connect(self.toggle_debug_mode)
-        debug_menu.addAction(debug_mode_action)
-
-        debug_menu.addSeparator()
-
-        toggle_bp_action = QAction("&Toggle Breakpoint", self)
-        toggle_bp_action.setShortcut("F9")
-        toggle_bp_action.triggered.connect(self.toggle_breakpoint)
-        debug_menu.addAction(toggle_bp_action)
-
-        clear_bp_action = QAction("&Clear Breakpoints", self)
-        clear_bp_action.triggered.connect(self.clear_breakpoints)
-        debug_menu.addAction(clear_bp_action)
-
-        debug_menu.addSeparator()
-
-        step_action = QAction("&Step Next", self)
-        step_action.setShortcut("F10")
-        step_action.triggered.connect(self.step_next)
-        debug_menu.addAction(step_action)
+        debugmenu = tk.Menu(menubar, tearoff=0)
+        debugmenu.add_command(label="Mode Debug", command=self.toggle_debug_mode, accelerator="F8")
+        debugmenu.add_separator()
+        debugmenu.add_command(label="Toggle Breakpoint", command=self.toggle_breakpoint, accelerator="F9")
+        debugmenu.add_command(label="Clear Breakpoints", command=self.clear_breakpoints)
+        debugmenu.add_separator()
+        debugmenu.add_command(label="Step Next", command=self.step_next, accelerator="F10")
+        menubar.add_cascade(label="Debug", menu=debugmenu)
 
         # Record menu
-        record_menu = menubar.addMenu("&Record")
-
-        start_rec_action = QAction("&Start Recording", self)
-        start_rec_action.triggered.connect(self.start_recording)
-        record_menu.addAction(start_rec_action)
-
-        stop_rec_action = QAction("S&top Recording", self)
-        stop_rec_action.triggered.connect(self.stop_recording)
-        record_menu.addAction(stop_rec_action)
+        recordmenu = tk.Menu(menubar, tearoff=0)
+        recordmenu.add_command(label="Start Recording", command=self.start_recording)
+        recordmenu.add_command(label="Stop Recording", command=self.stop_recording)
+        menubar.add_cascade(label="Record", menu=recordmenu)
 
         # Help menu
-        help_menu = menubar.addMenu("&Aide")
+        helpmenu = tk.Menu(menubar, tearoff=0)
+        helpmenu.add_command(label="À propos", command=self.show_about)
+        menubar.add_cascade(label="Aide", menu=helpmenu)
 
-        about_action = QAction("À &propos", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        self.config(menu=menubar)
 
         # Keyboard shortcuts
-        run_shortcut = QAction(self)
-        run_shortcut.setShortcut("F5")
-        run_shortcut.triggered.connect(self.start_macro)
-        self.addAction(run_shortcut)
+        self.bind('<Control-n>', lambda e: self.new_file())
+        self.bind('<Control-o>', lambda e: self.load_file())
+        self.bind('<Control-s>', lambda e: self.save_file())
+        self.bind('<F5>', lambda e: self.start_macro())
+        self.bind('<F7>', lambda e: self.validate_syntax())
+        self.bind('<F8>', lambda e: self.toggle_debug_mode())
+        self.bind('<F9>', lambda e: self.toggle_breakpoint())
+        self.bind('<F10>', lambda e: self.step_next())
 
     # File operations
     def new_file(self):
         """Create new file"""
-        reply = QMessageBox.question(self, "Nouveau fichier",
-                                     "Créer un nouveau fichier ?",
-                                     QMessageBox.Yes | QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
+        if messagebox.askyesno("Nouveau fichier", "Créer un nouveau fichier ?"):
             self.editor.set_content("")
             self.current_file = None
-            self.setWindowTitle("Macro Builder v4.0 - Nouveau")
+            self.title("Macro Builder v4.0 - Nouveau")
 
     def load_file(self):
         """Load a text file"""
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Ouvrir un fichier",
-            "",
-            "Text files (*.txt);;All files (*.*)"
+        path = filedialog.askopenfilename(
+            title="Ouvrir un fichier",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
         )
-
         if path:
             try:
                 script, speed, iterations, metadata = self.file_manager.load_file(path)
                 self.editor.set_content(script)
-                self.controls.speed_slider.setValue(int(speed * 10))
-                self.controls.iterations_spin.setValue(iterations)
+                self.controls.speed_var.set(speed)
+                self.controls.iterations_var.set(iterations)
                 self.current_file = path
-                self.setWindowTitle(f"Macro Builder v4.0 - {path}")
+                self.title(f"Macro Builder v4.0 - {path}")
                 self.controls.log(f"Fichier chargé: {path}")
             except Exception as e:
-                QMessageBox.critical(self, "Erreur",
-                                   f"Impossible de charger le fichier:\n{e}")
+                messagebox.showerror("Erreur", f"Impossible de charger le fichier:\n{e}")
 
     def save_file(self):
         """Save current file"""
@@ -223,64 +152,52 @@ class MacroBuilderWindow(QMainWindow):
                 self.file_manager.save_text(self.current_file, content)
                 self.controls.log(f"Fichier enregistré: {self.current_file}")
             except Exception as e:
-                QMessageBox.critical(self, "Erreur",
-                                   f"Impossible d'enregistrer:\n{e}")
+                messagebox.showerror("Erreur", f"Impossible d'enregistrer:\n{e}")
         else:
             self.save_file_as()
 
     def save_file_as(self):
         """Save file as"""
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Enregistrer sous",
-            "",
-            "Text files (*.txt);;All files (*.*)"
+        path = filedialog.asksaveasfilename(
+            title="Enregistrer sous",
+            defaultextension='.txt',
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
         )
-
         if path:
             try:
                 content = self.editor.get_content()
                 self.file_manager.save_text(path, content)
                 self.current_file = path
-                self.setWindowTitle(f"Macro Builder v4.0 - {path}")
+                self.title(f"Macro Builder v4.0 - {path}")
                 self.controls.log(f"Fichier enregistré: {path}")
             except Exception as e:
-                QMessageBox.critical(self, "Erreur",
-                                   f"Impossible d'enregistrer:\n{e}")
+                messagebox.showerror("Erreur", f"Impossible d'enregistrer:\n{e}")
 
     def load_json(self):
         """Load JSON macro file"""
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Ouvrir JSON",
-            "",
-            "JSON files (*.json);;All files (*.*)"
+        path = filedialog.askopenfilename(
+            title="Ouvrir JSON",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
         )
-
         if path:
             try:
                 data = self.file_manager.load_json(path)
                 self.editor.set_content(data['script'])
-                self.controls.speed_slider.setValue(int(data.get('speed', 1.0) * 10))
-                self.controls.iterations_spin.setValue(
-                    data.get('metadata', {}).get('iterations', 1)
-                )
+                self.controls.speed_var.set(data.get('speed', 1.0))
+                self.controls.iterations_var.set(data.get('metadata', {}).get('iterations', 1))
                 self.current_file = path
-                self.setWindowTitle(f"Macro Builder v4.0 - {path}")
+                self.title(f"Macro Builder v4.0 - {path}")
                 self.controls.log(f"JSON chargé: {path} (v{data['version']})")
             except Exception as e:
-                QMessageBox.critical(self, "Erreur",
-                                   f"Impossible de charger JSON:\n{e}")
+                messagebox.showerror("Erreur", f"Impossible de charger JSON:\n{e}")
 
     def save_json(self):
         """Save as JSON macro file"""
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Enregistrer JSON",
-            "",
-            "JSON files (*.json);;All files (*.*)"
+        path = filedialog.asksaveasfilename(
+            title="Enregistrer JSON",
+            defaultextension='.json',
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
         )
-
         if path:
             try:
                 script = self.editor.get_content()
@@ -289,8 +206,7 @@ class MacroBuilderWindow(QMainWindow):
                 self.file_manager.save_json(path, script, speed, iterations)
                 self.controls.log(f"JSON enregistré: {path}")
             except Exception as e:
-                QMessageBox.critical(self, "Erreur",
-                                   f"Impossible d'enregistrer JSON:\n{e}")
+                messagebox.showerror("Erreur", f"Impossible d'enregistrer JSON:\n{e}")
 
     # Execution
     def validate_syntax(self):
@@ -299,9 +215,9 @@ class MacroBuilderWindow(QMainWindow):
         is_valid, message = self.parser.validate_syntax(script)
 
         if is_valid:
-            QMessageBox.information(self, "Validation", "Syntaxe OK ✓")
+            messagebox.showinfo("Validation", "Syntaxe OK ✓")
         else:
-            QMessageBox.critical(self, "Erreur de syntaxe", message)
+            messagebox.showerror("Erreur de syntaxe", message)
 
     def start_macro(self):
         """Start macro execution"""
@@ -322,7 +238,7 @@ class MacroBuilderWindow(QMainWindow):
         try:
             actions = self.parser.parse(script)
         except SyntaxError as e:
-            QMessageBox.critical(self, "Erreur", str(e))
+            messagebox.showerror("Erreur", str(e))
             return
 
         # Clear console
@@ -360,11 +276,11 @@ class MacroBuilderWindow(QMainWindow):
         if not self.executor.pause_event.is_set():
             self.executor.pause()
             self.controls.log("⏸ Pause")
-            self.controls.btn_pause.setText("▶ Reprendre")
+            self.controls.btn_pause.config(text="▶ Reprendre")
         else:
             self.executor.resume()
             self.controls.log("▶ Reprise")
-            self.controls.btn_pause.setText("⏸ Pause")
+            self.controls.btn_pause.config(text="⏸ Pause")
 
     # Debug
     def toggle_debug_mode(self):
@@ -380,9 +296,9 @@ class MacroBuilderWindow(QMainWindow):
 
     def toggle_breakpoint(self):
         """Toggle breakpoint at current line"""
-        # Get current line from editor cursor position
-        line, _ = self.editor.getCursorPosition()
-        line_num = line + 1  # Convert to 1-indexed
+        # Get current line from text widget
+        current = self.editor.text_widget.index('insert')
+        line_num = int(current.split('.')[0])
 
         self.editor.toggle_breakpoint(line_num)
 
@@ -415,9 +331,7 @@ class MacroBuilderWindow(QMainWindow):
             self.recorder.start_recording()
             self.recording = True
             self.controls.log("[RECORD] Enregistrement démarré")
-            QMessageBox.information(self, "Enregistrement",
-                                  "Enregistrement démarré. Effectuez vos actions "
-                                  "puis arrêtez l'enregistrement.")
+            messagebox.showinfo("Enregistrement", "Enregistrement démarré. Effectuez vos actions puis arrêtez l'enregistrement.")
 
     def stop_recording(self):
         """Stop recording and insert script"""
@@ -431,35 +345,45 @@ class MacroBuilderWindow(QMainWindow):
             # Insert into editor
             self.editor.set_content(script)
 
-            self.controls.log(f"[RECORD] Enregistrement arrêté - "
-                            f"{len(self.recorder.actions)} actions")
-            QMessageBox.information(self, "Enregistrement",
-                                  f"Script généré avec {len(self.recorder.actions)} actions")
+            self.controls.log(f"[RECORD] Enregistrement arrêté - {len(self.recorder.actions)} actions")
+            messagebox.showinfo("Enregistrement", f"Script généré avec {len(self.recorder.actions)} actions")
 
     # Callbacks
     def ask_input(self, prompt):
         """Thread-safe input dialog"""
-        text, ok = QInputDialog.getText(self, "Saisie", prompt)
+        result = [None]
 
-        if ok:
-            return text if text else ""
-        return ""
+        def do_ask():
+            try:
+                val = simpledialog.askstring("Saisie", prompt, parent=self)
+                result[0] = val if val is not None else ""
+            except Exception as e:
+                self.controls.log(f"[ERREUR INPUT] {e}")
+                result[0] = ""
+
+        # Execute in main thread
+        self.after(0, do_ask)
+
+        # Wait for result
+        import time
+        timeout = 0
+        while result[0] is None and timeout < 300:
+            self.update()
+            time.sleep(0.1)
+            timeout += 1
+
+        return result[0] if result[0] is not None else ""
 
     # Misc
     def show_about(self):
         """Show about dialog"""
-        QMessageBox.information(
-            self,
+        messagebox.showinfo(
             "À propos",
-            "Macro Builder v4.0 - Professional IDE\n\n"
+            "Macro Builder v4.0\n\n"
             "Application de création de macros clavier/souris\n"
             "avec langage DSL intégré.\n\n"
             "Fonctionnalités v4:\n"
-            "• Éditeur professionnel avec coloration syntaxique\n"
-            "• Auto-complétion intelligente\n"
-            "• Repliage de code (code folding)\n"
-            "• Détection d'erreurs en temps réel\n"
-            "• Recherche/remplacement avec regex\n"
+            "• Éditeur avec numéros de ligne\n"
             "• Support des fonctions\n"
             "• Mode debug avec breakpoints\n"
             "• Enregistrement d'actions\n"

@@ -1,128 +1,205 @@
 """
-Code Editor Module
-Text editor with line numbers, breakpoint support, and line highlighting for debug mode
+Code Editor Module (PyQt5/QScintilla version)
+Professional code editor with syntax highlighting, auto-completion, code folding, and debugging features
 """
-import tkinter as tk
-from tkinter import ttk
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, QLabel, QShortcut
+from PyQt5.QtGui import QColor, QFont, QKeySequence
+from PyQt5.QtCore import Qt
+from PyQt5.Qsci import QsciScintilla
+
+from .lexer import MacroDSLLexer
+from .autocomplete import MacroAutoComplete
 
 
-class CodeEditor(tk.Frame):
-    """Code editor with line numbers and debug features"""
+class MacroEditor(QsciScintilla):
+    """Professional code editor based on QScintilla"""
 
-    def __init__(self, parent, **kwargs):
+    # Marker constants
+    MARKER_BREAKPOINT = 1
+    MARKER_DEBUG_LINE = 2
+
+    def __init__(self, parent=None, parser=None):
         """
         Initialize code editor
 
         Args:
             parent: Parent widget
-            **kwargs: Additional frame arguments
+            parser: ScriptParser instance for validation (optional)
         """
-        super().__init__(parent, **kwargs)
+        super().__init__(parent)
 
         self.breakpoints = set()  # Set of line numbers with breakpoints
         self.current_line = None  # Currently highlighted line (debug mode)
+        self.search_dialog = None
 
-        self._build_ui()
+        # Setup editor components
+        self._setup_editor()
+        self._setup_margins()
+        self._setup_lexer()
+        self._setup_folding()
+        self._setup_autocompletion()
+        self._setup_shortcuts()
 
-    def _build_ui(self):
-        """Build editor UI with line numbers"""
-        # Create container frame
-        container = tk.Frame(self)
-        container.pack(fill='both', expand=True)
+        # Setup validator if parser provided
+        if parser:
+            from engine.validator import MacroValidator
+            self.validator = MacroValidator(self, parser)
 
-        # Line numbers widget
-        self.line_numbers = tk.Text(
-            container,
-            width=4,
-            padx=4,
-            takefocus=0,
-            border=0,
-            background='#f0f0f0',
-            foreground='#666',
-            state='disabled',
-            wrap='none',
-            font=('Consolas', 10)
-        )
-        self.line_numbers.pack(side='left', fill='y')
+    def _setup_editor(self):
+        """Configure basic editor properties"""
+        # Font configuration
+        font = QFont("Consolas", 10)
+        self.setFont(font)
+        self.setMarginsFont(font)
 
-        # Main text editor
-        self.text_widget = tk.Text(
-            container,
-            wrap='none',
-            undo=True,
-            font=('Consolas', 10)
-        )
-        self.text_widget.pack(side='left', fill='both', expand=True)
+        # Tab configuration
+        self.setTabWidth(4)
+        self.setIndentationsUseTabs(False)
+        self.setAutoIndent(True)
 
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(container, command=self._on_scroll)
-        scrollbar.pack(side='right', fill='y')
+        # Caret configuration
+        self.setCaretLineVisible(True)
+        self.setCaretLineBackgroundColor(QColor("#E8F2FF"))
+        self.setCaretForegroundColor(QColor("#000000"))
 
-        self.text_widget.config(yscrollcommand=scrollbar.set)
+        # Selection colors
+        self.setSelectionBackgroundColor(QColor("#A6D2FF"))
+        self.setSelectionForegroundColor(QColor("#000000"))
 
-        # Bind events
-        self.text_widget.bind('<<Modified>>', self._on_text_modified)
-        self.text_widget.bind('<KeyRelease>', self._on_text_modified)
-        self.text_widget.bind('<ButtonRelease-1>', self._on_text_modified)
-        self.line_numbers.bind('<Button-1>', self._on_line_number_click)
+        # Brace matching
+        self.setBraceMatching(QsciScintilla.SloppyBraceMatch)
+        self.setMatchedBraceBackgroundColor(QColor("#B4EEB4"))
+        self.setMatchedBraceForegroundColor(QColor("#000000"))
 
-        # Configure tags for highlighting
-        self.text_widget.tag_config('current_line', background='#ffff99')  # Yellow for current line
-        self.line_numbers.tag_config('breakpoint', background='#ff6b6b', foreground='white')  # Red for breakpoint
-        self.line_numbers.tag_config('current_line', background='#ffff99')
+        # Whitespace visibility
+        self.setWhitespaceVisibility(QsciScintilla.WsInvisible)
 
-        # Initial line numbers
-        self.update_line_numbers()
+        # Edge mode (optional line length indicator)
+        self.setEdgeMode(QsciScintilla.EdgeNone)
 
-    def _on_scroll(self, *args):
-        """Handle scrollbar events"""
-        self.text_widget.yview(*args)
-        self.line_numbers.yview(*args)
+        # Enable undo/redo
+        self.setUtf8(True)
 
-    def _on_text_modified(self, event=None):
-        """Handle text modifications"""
-        # Clear modified flag
-        self.text_widget.edit_modified(False)
+    def _setup_margins(self):
+        """Configure line numbers and breakpoint margins"""
+        # Margin 0: Line numbers
+        self.setMarginType(0, QsciScintilla.NumberMargin)
+        self.setMarginWidth(0, "0000")
+        self.setMarginsForegroundColor(QColor("#666666"))
+        self.setMarginsBackgroundColor(QColor("#F0F0F0"))
 
-        # Update line numbers
-        self.update_line_numbers()
+        # Margin 1: Breakpoint/debug margin
+        self.setMarginType(1, QsciScintilla.SymbolMargin)
+        self.setMarginWidth(1, 20)
+        self.setMarginSensitivity(1, True)
+        self.setMarginMarkerMask(1, (1 << self.MARKER_BREAKPOINT) | (1 << self.MARKER_DEBUG_LINE))
 
-    def _on_line_number_click(self, event):
-        """Handle click on line numbers (toggle breakpoint)"""
-        # Get line number from click position
-        index = self.line_numbers.index(f"@{event.x},{event.y}")
-        line_num = int(index.split('.')[0])
+        # Connect margin click
+        self.marginClicked.connect(self._on_margin_clicked)
 
-        # Toggle breakpoint
-        self.toggle_breakpoint(line_num)
+        # Define breakpoint marker (red circle)
+        self.markerDefine(QsciScintilla.Circle, self.MARKER_BREAKPOINT)
+        self.setMarkerBackgroundColor(QColor("#FF0000"), self.MARKER_BREAKPOINT)
+        self.setMarkerForegroundColor(QColor("#FFFFFF"), self.MARKER_BREAKPOINT)
 
-    def update_line_numbers(self):
-        """Update line number display"""
-        # Get number of lines
-        line_count = int(self.text_widget.index('end-1c').split('.')[0])
+        # Define debug line marker (yellow arrow)
+        self.markerDefine(QsciScintilla.RightArrow, self.MARKER_DEBUG_LINE)
+        self.setMarkerBackgroundColor(QColor("#FFFF00"), self.MARKER_DEBUG_LINE)
+        self.setMarkerForegroundColor(QColor("#000000"), self.MARKER_DEBUG_LINE)
 
-        # Build line number text
-        line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
+    def _setup_lexer(self):
+        """Attach custom lexer for syntax highlighting"""
+        self.lexer = MacroDSLLexer(self)
+        self.setLexer(self.lexer)
 
-        # Update line numbers widget
-        self.line_numbers.config(state='normal')
-        self.line_numbers.delete('1.0', 'end')
-        self.line_numbers.insert('1.0', line_numbers_text)
+    def _setup_folding(self):
+        """Enable code folding"""
+        self.setFolding(QsciScintilla.BoxedTreeFoldStyle)
+        self.setFoldMarginColors(QColor("#F0F0F0"), QColor("#F0F0F0"))
 
-        # Re-apply breakpoint tags
-        for line_num in self.breakpoints:
-            if line_num <= line_count:
-                self.line_numbers.tag_add('breakpoint', f"{line_num}.0", f"{line_num}.end")
+    def _setup_autocompletion(self):
+        """Configure auto-completion"""
+        self.autocomplete = MacroAutoComplete(self.lexer)
 
-        # Re-apply current line tag
-        if self.current_line and self.current_line <= line_count:
-            self.line_numbers.tag_add('current_line', f"{self.current_line}.0", f"{self.current_line}.end")
+        # Configure behavior
+        self.setAutoCompletionSource(QsciScintilla.AcsAPIs)
+        self.setAutoCompletionThreshold(1)  # Show after 1 character
+        self.setAutoCompletionCaseSensitivity(False)
+        self.setAutoCompletionReplaceWord(True)
 
-        self.line_numbers.config(state='disabled')
+        # Call tips for functions
+        self.setCallTipsStyle(QsciScintilla.CallTipsContext)
+        self.setCallTipsVisible(0)
 
-        # Sync scrolling
-        self.line_numbers.yview_moveto(self.text_widget.yview()[0])
+    def _setup_shortcuts(self):
+        """Setup keyboard shortcuts"""
+        # Ctrl+F for search
+        search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        search_shortcut.activated.connect(self.show_search_dialog)
 
+        # Ctrl+H for replace
+        replace_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
+        replace_shortcut.activated.connect(self.show_search_dialog)
+
+    def _on_margin_clicked(self, margin, line, modifiers):
+        """Handle margin clicks for breakpoints"""
+        if margin == 1:  # Breakpoint margin
+            self.toggle_breakpoint(line + 1)  # Convert to 1-indexed
+
+    # Breakpoint management
+    def toggle_breakpoint(self, line_number):
+        """
+        Toggle breakpoint at line
+
+        Args:
+            line_number: Line number (1-indexed)
+        """
+        if line_number in self.breakpoints:
+            self.breakpoints.remove(line_number)
+            self.markerDelete(line_number - 1, self.MARKER_BREAKPOINT)
+        else:
+            self.breakpoints.add(line_number)
+            self.markerAdd(line_number - 1, self.MARKER_BREAKPOINT)
+
+    def clear_breakpoints(self):
+        """Clear all breakpoints"""
+        self.breakpoints.clear()
+        self.markerDeleteAll(self.MARKER_BREAKPOINT)
+
+    def get_breakpoints(self):
+        """
+        Get all breakpoints
+
+        Returns:
+            Set of line numbers with breakpoints (1-indexed)
+        """
+        return self.breakpoints.copy()
+
+    # Debug line highlighting
+    def highlight_line(self, line_number):
+        """
+        Highlight a line (for debug mode)
+
+        Args:
+            line_number: Line number to highlight (1-indexed), or None to clear
+        """
+        # Clear previous debug markers
+        self.markerDeleteAll(self.MARKER_DEBUG_LINE)
+
+        if line_number:
+            self.current_line = line_number
+            # Add debug marker (0-indexed)
+            self.markerAdd(line_number - 1, self.MARKER_DEBUG_LINE)
+            # Scroll to line
+            self.ensureLineVisible(line_number - 1)
+        else:
+            self.current_line = None
+
+    def clear_highlight(self):
+        """Clear line highlighting"""
+        self.highlight_line(None)
+
+    # Content management
     def get_content(self):
         """
         Get editor content
@@ -130,7 +207,7 @@ class CodeEditor(tk.Frame):
         Returns:
             Editor text as string
         """
-        return self.text_widget.get('1.0', 'end-1c')
+        return self.text()
 
     def set_content(self, text):
         """
@@ -139,61 +216,156 @@ class CodeEditor(tk.Frame):
         Args:
             text: Text to set
         """
-        self.text_widget.delete('1.0', 'end')
-        self.text_widget.insert('1.0', text)
-        self.update_line_numbers()
+        self.setText(text)
 
-    def highlight_line(self, line_number):
+    # Search and Replace
+    def show_search_dialog(self):
+        """Show search/replace dialog"""
+        if not self.search_dialog:
+            self.search_dialog = SearchDialog(self, self.parent())
+        self.search_dialog.show()
+        self.search_dialog.find_input.setFocus()
+        self.search_dialog.find_input.selectAll()
+
+
+class SearchDialog(QDialog):
+    """Search and Replace dialog with regex support"""
+
+    def __init__(self, editor, parent=None):
+        super().__init__(parent)
+        self.editor = editor
+        self.setWindowTitle("Find and Replace")
+        self.setMinimumWidth(450)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Setup dialog UI"""
+        layout = QVBoxLayout()
+
+        # Find field
+        find_layout = QHBoxLayout()
+        find_layout.addWidget(QLabel("Find:"))
+        self.find_input = QLineEdit()
+        self.find_input.setPlaceholderText("Enter search text...")
+        self.find_input.returnPressed.connect(self._find_next)
+        find_layout.addWidget(self.find_input)
+        layout.addLayout(find_layout)
+
+        # Replace field
+        replace_layout = QHBoxLayout()
+        replace_layout.addWidget(QLabel("Replace:"))
+        self.replace_input = QLineEdit()
+        self.replace_input.setPlaceholderText("Enter replacement text...")
+        self.replace_input.returnPressed.connect(self._replace)
+        replace_layout.addWidget(self.replace_input)
+        layout.addLayout(replace_layout)
+
+        # Options
+        options_layout = QHBoxLayout()
+        self.case_sensitive = QCheckBox("Case sensitive")
+        self.whole_word = QCheckBox("Whole word")
+        self.regex = QCheckBox("Regular expression")
+        options_layout.addWidget(self.case_sensitive)
+        options_layout.addWidget(self.whole_word)
+        options_layout.addWidget(self.regex)
+        options_layout.addStretch()
+        layout.addLayout(options_layout)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.find_next_btn = QPushButton("Find Next")
+        self.find_prev_btn = QPushButton("Find Previous")
+        self.replace_btn = QPushButton("Replace")
+        self.replace_all_btn = QPushButton("Replace All")
+        self.close_btn = QPushButton("Close")
+
+        self.find_next_btn.clicked.connect(self._find_next)
+        self.find_prev_btn.clicked.connect(self._find_previous)
+        self.replace_btn.clicked.connect(self._replace)
+        self.replace_all_btn.clicked.connect(self._replace_all)
+        self.close_btn.clicked.connect(self.close)
+
+        button_layout.addWidget(self.find_next_btn)
+        button_layout.addWidget(self.find_prev_btn)
+        button_layout.addWidget(self.replace_btn)
+        button_layout.addWidget(self.replace_all_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(self.close_btn)
+        layout.addLayout(button_layout)
+
+        # Status label
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: #666666; font-style: italic;")
+        layout.addWidget(self.status_label)
+
+        self.setLayout(layout)
+
+    def _find_next(self):
+        """Find next occurrence"""
+        self._find(forward=True)
+
+    def _find_previous(self):
+        """Find previous occurrence"""
+        self._find(forward=False)
+
+    def _find(self, forward=True):
         """
-        Highlight a line (for debug mode)
+        Find text in editor
 
         Args:
-            line_number: Line number to highlight
+            forward: Search direction
         """
-        # Clear previous highlight
-        self.text_widget.tag_remove('current_line', '1.0', 'end')
+        search_text = self.find_input.text()
+        if not search_text:
+            self.status_label.setText("Enter search text")
+            return
 
-        # Highlight new line
-        if line_number:
-            self.current_line = line_number
-            self.text_widget.tag_add('current_line', f"{line_number}.0", f"{line_number}.end+1c")
+        # QScintilla search flags
+        found = self.editor.findFirst(
+            search_text,
+            self.regex.isChecked(),
+            self.case_sensitive.isChecked(),
+            self.whole_word.isChecked(),
+            True,  # Wrap search
+            forward=forward
+        )
 
-            # Scroll to line
-            self.text_widget.see(f"{line_number}.0")
-
-            # Update line numbers
-            self.update_line_numbers()
+        if found:
+            self.status_label.setText("")
         else:
-            self.current_line = None
+            self.status_label.setText(f"'{search_text}' not found")
 
-    def toggle_breakpoint(self, line_number):
-        """
-        Toggle breakpoint at line
-
-        Args:
-            line_number: Line number
-        """
-        if line_number in self.breakpoints:
-            self.breakpoints.remove(line_number)
+    def _replace(self):
+        """Replace current selection"""
+        if self.editor.hasSelectedText():
+            self.editor.replace(self.replace_input.text())
+            self._find_next()
+            self.status_label.setText("Replaced")
         else:
-            self.breakpoints.add(line_number)
+            self.status_label.setText("No selection to replace")
 
-        self.update_line_numbers()
+    def _replace_all(self):
+        """Replace all occurrences"""
+        search_text = self.find_input.text()
+        replace_text = self.replace_input.text()
 
-    def clear_breakpoints(self):
-        """Clear all breakpoints"""
-        self.breakpoints.clear()
-        self.update_line_numbers()
+        if not search_text:
+            self.status_label.setText("Enter search text")
+            return
 
-    def get_breakpoints(self):
-        """
-        Get all breakpoints
+        # Start from beginning
+        self.editor.setCursorPosition(0, 0)
 
-        Returns:
-            Set of line numbers with breakpoints
-        """
-        return self.breakpoints.copy()
+        count = 0
+        while self.editor.findFirst(
+            search_text,
+            self.regex.isChecked(),
+            self.case_sensitive.isChecked(),
+            self.whole_word.isChecked(),
+            False,  # Don't wrap for replace all
+            forward=True
+        ):
+            self.editor.replace(replace_text)
+            count += 1
 
-    def clear_highlight(self):
-        """Clear line highlighting"""
-        self.highlight_line(None)
+        self.status_label.setText(f"Replaced {count} occurrence(s)")

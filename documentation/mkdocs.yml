@@ -9,7 +9,7 @@ repo_url: https://github.com/pite772/macro-builder
 
 # Configuration
 theme:
-  name: material
+  name: readthedocs
   language: fr
   palette:
     # Palette basculante jour/nuit
@@ -34,22 +34,7 @@ theme:
     - content.code.copy
 
 # Extensions
-markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - attr_list
-  - md_in_html
-  - toc:
-      permalink: true
+
 
 # Plugins
 plugins:
@@ -61,6 +46,7 @@ nav:
   - Accueil: index.md
   - Installation: installation.md
   - Guide d'utilisation: utilisation.md
+  - Référence du langage (commandes): command-reference.md
   - Exemples: exemples.md
   - Modules:
     - Évaluation sécurisée: module/safe_eval.md
